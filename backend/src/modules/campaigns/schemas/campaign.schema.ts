@@ -14,8 +14,9 @@ export enum GenerationStatus {
 
 /**
  * Schema representing an individual generated message for a contact.
- * Kept as an embedded sub-document to avoid expensive $lookup aggregations
- * since a campaign in a 1% slice will easily fit under the 16MB document limit.
+ * Kept as an embedded sub-document to avoid expensive $lookup aggregations.
+ * This is highly performant and safe for this project's scope, as the array 
+ * of contacts will easily stay well below MongoDB's 16MB document size limit.
  */
 @Schema({ _id: false })
 export class CampaignContact {

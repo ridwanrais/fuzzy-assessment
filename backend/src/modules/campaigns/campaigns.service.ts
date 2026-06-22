@@ -14,7 +14,7 @@ export class CampaignsService {
     private readonly campaignModel: Model<CampaignDocument>,
     private readonly contactsService: ContactsService,
     private readonly llm: LlmService,
-  ) {}
+  ) { }
 
   async create(userId: string, dto: CreateCampaignDto): Promise<Campaign> {
     const createdCampaign = new this.campaignModel({
@@ -37,12 +37,12 @@ export class CampaignsService {
     if (!campaign) {
       throw new NotFoundException('Campaign not found');
     }
-    
+
     await campaign.populate({
       path: 'contacts.contactId',
       model: 'Contact',
     });
-    
+
     const doc = campaign.toObject();
     const mappedContacts = doc.contacts.map((c) => {
       // At this point, c.contactId is the populated Contact object.
@@ -53,7 +53,7 @@ export class CampaignsService {
         contactId: populatedContact._id.toString(),
       };
     });
-    
+
     return {
       ...doc,
       contacts: mappedContacts,
@@ -123,12 +123,15 @@ export class CampaignsService {
         company: contact.company || '',
         title: contact.title || '',
       };
-      
+
       prompt = prompt.replace(/\{\{(\w+)\}\}/g, (_, key) => {
         return data[key] || '';
       });
 
-      const message = await this.llm.complete(prompt);
+      const systemInstruction = `\n\nIMPORTANT: Write the final email ready to send. Do NOT use any placeholders like [Your Name]. The sender of the email is "Test User". You MUST sign off the email with "Best regards,\nTest User".`;
+      const finalPrompt = prompt + systemInstruction;
+
+      const message = await this.llm.complete(finalPrompt);
 
       campaignContact.status = GenerationStatus.FINISHED;
       campaignContact.generatedMessage = message;

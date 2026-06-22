@@ -39,6 +39,8 @@ export class LlmService {
         return 'gpt-4o-mini';
       case 'gemini':
         return 'gemini-2.0-flash';
+      case 'ollama':
+        return 'qwen2.5-coder:14b';
       case 'anthropic':
       default:
         return 'claude-haiku-4-5';
@@ -55,6 +57,8 @@ export class LlmService {
         return this.completeOpenai(prompt);
       case 'gemini':
         return this.completeGemini(prompt);
+      case 'ollama':
+        return this.completeOllama(prompt);
       case 'anthropic':
         return this.completeAnthropic(prompt);
       default:
@@ -98,5 +102,20 @@ export class LlmService {
     const model = client.getGenerativeModel({ model: this.model });
     const res = await model.generateContent(prompt);
     return res.response.text().trim();
+  }
+
+  // --- Ollama (via OpenAI SDK) ---------------------------------------------
+  private async completeOllama(prompt: string): Promise<string> {
+    const OpenAI = (await import('openai')).default;
+    const client = new OpenAI({ 
+      apiKey: 'ollama', // Ollama doesn't require a real API key
+      baseURL: process.env.OLLAMA_BASE_URL || 'http://localhost:11434/v1',
+    });
+    const res = await client.chat.completions.create({
+      model: this.model,
+      max_tokens: this.maxTokens,
+      messages: [{ role: 'user', content: prompt }],
+    });
+    return (res.choices[0]?.message?.content || '').trim();
   }
 }

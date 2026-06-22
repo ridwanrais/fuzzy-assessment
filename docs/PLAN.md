@@ -9,9 +9,9 @@ _Schemas you'll create, key fields, and the index(es) you chose + why._
 
 - Contact: userId (String), name (String), email (String), company (String, optional), title (String, optional).
 - Campaign: userId (String), name (String), promptTemplate (String).
-- CampaignContact (Mapping collection): userId (String), campaignId (ObjectId), contactId (ObjectId), status ('pending' | 'finished' | 'failed'), message (String), error (String).
+- CampaignContact (Embedded Sub-document): contactId (ObjectId), status ('not_generated' | 'pending' | 'finished' | 'failed'), generatedMessage (String), error (String), history (Array).
 
-Contact and Campaign collections are used to manage the lists of contacts and campaigns. CampaignContact serves as a 'junction collection' that links contacts and campaigns, storing the generation status per contact.
+Contact and Campaign collections are used to manage the lists of contacts and campaigns. CampaignContact is embedded directly within the Campaign schema as a sub-document array, storing the generation status and history per contact.
 
 **Modeling Justification (CampaignContact):**
 I chose to keep `CampaignContact` embedded within the `Campaign` document as a sub-document array rather than breaking it out into a standalone collection. 
@@ -20,7 +20,7 @@ I chose to keep `CampaignContact` embedded within the `Campaign` document as a s
 **Index Justification:**
 - `Contact`: Compound indexes on `{ userId: 1, name: 1, _id: 1 }` and `{ userId: 1, createdAt: 1, _id: 1 }`. 
   - *Why*: Following the ESR (Equality, Sort, Range) rule. Everything is scoped to a user, so `userId` comes first (Equality). `name` and `createdAt` are used for sorting (Sort). Finally, because names and timestamps are non-unique, sorting on them isn't guaranteed to be stable across pagination requests. Appending `_id` creates an absolute tie-breaker, guaranteeing deterministic pagination so no records are skipped or duplicated.
-- `CampaignContact`: An index on `{ userId: 1, campaignId: 1, contactId: 1 }` to quickly fetch attached contacts and prevent attaching the same contact twice.
+- `Campaign`: A single index on `userId` to quickly fetch all campaigns for the logged-in user. Uniqueness of `contactId` within the embedded `CampaignContact` array is enforced cleanly in the application layer.
 
 
 ## 2. API surface
@@ -47,7 +47,7 @@ _What status transitions does a contact's message go through?_
   1. Set `CampaignContact` status to `pending`.
   2. Parse `promptTemplate` by replacing `{{variables}}` with contact fields.
   3. Attempt `LlmService.complete()`.
-  4. On success: Update status to `finished` and save the `message`.
+  4. On success: Update status to `finished` and save the `generatedMessage`.
   5. On failure (Timeout/Provider Error): The `catch` block intercepts the exception, updates status to `failed`, and records the sanitized error message.
   6. **Return**: The endpoint returns a `200 OK` (containing the updated object with its `failed` state) rather than throwing an unhandled `500` exception to the client.
 

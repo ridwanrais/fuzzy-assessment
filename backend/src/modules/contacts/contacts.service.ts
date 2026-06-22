@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import mongoose, { Model } from 'mongoose';
 import { Contact, ContactDocument } from './schemas/contact.schema';
 import { CreateContactDto } from './dtos/create-contact.dto';
 import { ListContactsDto } from './dtos/list-contacts.dto';
@@ -13,25 +13,44 @@ export class ContactsService {
   ) {}
 
   async create(userId: string, dto: CreateContactDto): Promise<Contact> {
-    // TODO(candidate): persist a user-scoped contact.
-    throw new Error('Not implemented');
+    const createdContact = new this.contactModel({
+      ...dto,
+      userId,
+    });
+    return createdContact.save();
   }
 
   async list(
     userId: string,
     query: ListContactsDto,
   ): Promise<{ items: Contact[]; total: number; page: number; limit: number }> {
-    // TODO(candidate): return a paginated, searchable, sorted list scoped to
-    // userId. Make the ordering deterministic so paging is consistent.
-    throw new Error('Not implemented');
+    const { page = 1, limit = 20, search, sort = 'createdAt' } = query;
+    const skip = (page - 1) * limit;
+
+    const filter: mongoose.FilterQuery<ContactDocument> = { userId };
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { company: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    // Deterministic sorting using _id as a tie-breaker
+    const sortObj: Record<string, 1 | -1> = { [sort]: 1, _id: 1 };
+
+    const [items, total] = await Promise.all([
+      this.contactModel.find(filter).sort(sortObj).skip(skip).limit(limit).exec(),
+      this.contactModel.countDocuments(filter).exec(),
+    ]);
+
+    return { items, total, page, limit };
   }
 
   /**
    * Look up specific contacts owned by a user. The campaigns module needs this
    * to attach/generate against contacts without reaching into the model itself.
-   * TODO(candidate): implement (return only contacts whose userId matches).
    */
   async findOwnedByIds(userId: string, contactIds: string[]): Promise<Contact[]> {
-    throw new Error('Not implemented');
+    return this.contactModel.find({ userId, _id: { $in: contactIds } }).exec();
   }
 }

@@ -2,12 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 
 /**
- * STARTER schema — extend as needed.
- *
- * TODO(candidate):
- *  - Decide required vs optional fields and types.
- *  - Add at least one index you can justify (think about how the list is queried:
- *    user-scoping, search, and sort). Be ready to explain your choice.
+ * Contact schema representing an individual target for outreach.
  */
 @Schema({ timestamps: true })
 export class Contact {
@@ -33,5 +28,6 @@ export class Contact {
 export type ContactDocument = Contact & Document;
 export const ContactSchema = SchemaFactory.createForClass(Contact);
 
-// TODO(candidate): add any index(es) that fit how the list endpoint queries
-// this collection. Justify your choice in PLAN.md.
+// Indexes for fast retrieval by user and deterministic pagination
+ContactSchema.index({ userId: 1, name: 1, _id: 1 });
+ContactSchema.index({ userId: 1, createdAt: 1, _id: 1 });

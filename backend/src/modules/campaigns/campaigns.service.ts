@@ -1,7 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { Campaign, CampaignDocument } from './schemas/campaign.schema';
+import mongoose, { Model } from 'mongoose';
+import { Campaign, CampaignDocument, GenerationStatus } from './schemas/campaign.schema';
 import { CreateCampaignDto } from './dtos/create-campaign.dto';
 import { AttachContactsDto } from './dtos/attach-contacts.dto';
 import { ContactsService } from '../contacts/contacts.service';
@@ -17,13 +17,29 @@ export class CampaignsService {
   ) {}
 
   async create(userId: string, dto: CreateCampaignDto): Promise<Campaign> {
-    // TODO(candidate): create a user-scoped campaign.
-    throw new Error('Not implemented');
+    const createdCampaign = new this.campaignModel({
+      ...dto,
+      userId,
+    });
+    return createdCampaign.save();
   }
 
   async getOne(userId: string, campaignId: string): Promise<Campaign> {
-    // TODO(candidate): fetch a campaign scoped to userId (404 if not found/owned).
-    throw new Error('Not implemented');
+    const campaign = await this.campaignModel.findOne({ _id: campaignId, userId }).exec();
+    if (!campaign) {
+      throw new NotFoundException('Campaign not found');
+    }
+    
+    // In a real scenario we might want to .populate('contacts.contactId') here,
+    // but the subdoc only has contactId. We can fetch and map the contacts.
+    // For simplicity, we just return the campaign. The frontend or controller could stitch it if needed.
+    // Actually, populating is better so the frontend has contact names.
+    await campaign.populate({
+      path: 'contacts.contactId',
+      model: 'Contact',
+    });
+    
+    return campaign;
   }
 
   async attachContacts(
@@ -31,28 +47,90 @@ export class CampaignsService {
     campaignId: string,
     dto: AttachContactsDto,
   ): Promise<Campaign> {
-    // TODO(candidate): attach existing (user-owned) contacts to the campaign.
-    throw new Error('Not implemented');
+    const campaign = await this.campaignModel.findOne({ _id: campaignId, userId }).exec();
+    if (!campaign) {
+      throw new NotFoundException('Campaign not found');
+    }
+
+    // Verify contacts belong to user
+    const ownedContacts = await this.contactsService.findOwnedByIds(userId, dto.contactIds);
+    const ownedContactIds = new Set(ownedContacts.map(c => (c as unknown as mongoose.Document)._id.toString()));
+
+    const existingContactIds = new Set(campaign.contacts.map(c => c.contactId.toString()));
+
+    for (const contactId of dto.contactIds) {
+      if (ownedContactIds.has(contactId) && !existingContactIds.has(contactId)) {
+        campaign.contacts.push({
+          contactId: contactId as unknown as mongoose.Types.ObjectId,
+          status: GenerationStatus.NOT_GENERATED,
+        });
+      }
+    }
+
+    return campaign.save();
   }
 
-  /**
-   * THE CENTERPIECE.
-   *
-   * 1. Load the campaign + the contact (both must belong to userId).
-   * 2. Interpolate the contact's fields into campaign.promptTemplate.
-   * 3. Set status PENDING, call this.llm.complete(...), persist the result.
-   * 4. On success -> FINISHED + generatedMessage. On any error -> FAILED + error.
-   *
-   * Think about: provider errors, timeouts, a template referencing a missing field,
-   * and what happens if this is called twice for the same contact.
-   */
   async generateForContact(
     userId: string,
     campaignId: string,
     contactId: string,
   ): Promise<{ status: string; message?: string; error?: string }> {
-    // TODO(candidate): implement. Do not let a provider error throw an unhandled
-    // 500 — record FAILED and return a sensible shape.
-    throw new Error('Not implemented');
+    const campaign = await this.campaignModel.findOne({ _id: campaignId, userId }).exec();
+    if (!campaign) {
+      throw new NotFoundException('Campaign not found');
+    }
+
+    const campaignContact = campaign.contacts.find(c => c.contactId.toString() === contactId);
+    if (!campaignContact) {
+      throw new NotFoundException('Contact not attached to this campaign');
+    }
+
+    const contacts = await this.contactsService.findOwnedByIds(userId, [contactId]);
+    if (contacts.length === 0) {
+      throw new NotFoundException('Contact not found');
+    }
+    const contact = contacts[0];
+
+    // Set to pending
+    campaignContact.status = GenerationStatus.PENDING;
+    campaignContact.error = undefined;
+    await campaign.save();
+
+    try {
+      // Interpolate
+      let prompt = campaign.promptTemplate;
+      const data: Record<string, string> = {
+        name: contact.name || '',
+        email: contact.email || '',
+        company: contact.company || '',
+        title: contact.title || '',
+      };
+      
+      prompt = prompt.replace(/\{\{(\w+)\}\}/g, (_, key) => {
+        return data[key] || '';
+      });
+
+      const message = await this.llm.complete(prompt);
+
+      campaignContact.status = GenerationStatus.FINISHED;
+      campaignContact.generatedMessage = message;
+      await campaign.save();
+
+      return {
+        status: campaignContact.status,
+        message: campaignContact.generatedMessage,
+      };
+    } catch (err: unknown) {
+      // Handle error gracefully
+      campaignContact.status = GenerationStatus.FAILED;
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      campaignContact.error = errorMessage || 'LLM Generation failed';
+      await campaign.save();
+
+      return {
+        status: campaignContact.status,
+        error: campaignContact.error,
+      };
+    }
   }
 }

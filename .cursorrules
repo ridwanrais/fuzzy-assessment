@@ -1,0 +1,3 @@
+# AI Rules & Guidelines
+
+- **No `any` Types**: Do not use the `any` type anywhere in the codebase. Always use proper TypeScript types, interfaces, or generics. If the exact type is unknown or dynamic, use `unknown` and perform type checking/narrowing instead of relying on `any`.

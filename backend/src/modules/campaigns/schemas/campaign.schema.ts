@@ -13,12 +13,9 @@ export enum GenerationStatus {
 }
 
 /**
- * STARTER schema. A campaign has a prompt template and a set of attached contacts,
- * each with its own generated message + status.
- *
- * TODO(candidate): model this however you think is cleanest. The embedded
- * sub-document below is a suggestion, not a requirement — you may normalize it
- * into its own collection if you prefer. Be ready to defend the choice.
+ * Schema representing an individual generated message for a contact.
+ * Kept as an embedded sub-document to avoid expensive $lookup aggregations
+ * since a campaign in a 1% slice will easily fit under the 16MB document limit.
  */
 @Schema({ _id: false })
 export class CampaignContact {

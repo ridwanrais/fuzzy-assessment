@@ -12,8 +12,11 @@ export default function CampaignDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const { data: campaign, loading, error, generateMutation, attachMutation } = useCampaign(id);
+  const { data: campaign, loading, error, generateMutation, attachMutation, updateMutation } = useCampaign(id);
   const [generatingIds, setGeneratingIds] = useState<Set<string>>(new Set());
+  
+  // Edit Campaign State
+  const [editCampaignModal, setEditCampaignModal] = useState<{ name: string, promptTemplate: string } | null>(null);
   
   // Attach Modal State
   const [showAttachModal, setShowAttachModal] = useState(false);
@@ -25,6 +28,9 @@ export default function CampaignDetailPage({
 
   // History State
   const [showHistoryId, setShowHistoryId] = useState<string | null>(null);
+
+  // Expanded Message State
+  const [expandedMessageIds, setExpandedMessageIds] = useState<Set<string>>(new Set());
 
   // Debounce Ref
   const lastClickRef = useRef<Record<string, number>>({});
@@ -108,23 +114,32 @@ export default function CampaignDetailPage({
 
   if (!campaign) return null;
 
-  const stats = campaign.stats || { total: 0, finished: 0 };
-  const progressPercent = stats.total > 0 ? Math.round((stats.finished / stats.total) * 100) : 0;
+  const totalContacts = campaign.contacts.length;
+  const finishedContacts = campaign.contacts.filter((c) => c.status === 'finished').length;
+  const progressPercent = totalContacts > 0 ? Math.round((finishedContacts / totalContacts) * 100) : 0;
 
   return (
     <div style={{ maxWidth: 1000, margin: '0 auto', fontFamily: 'system-ui, sans-serif' }}>
-      <div style={{ marginBottom: '32px' }}>
-        <h1 style={{ fontSize: '28px', color: '#0f172a', marginBottom: '8px', fontWeight: 600 }}>{campaign.name}</h1>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', color: '#64748b', fontSize: '14px' }}>
-          <span>Campaign ID:</span>
-          <code style={{ backgroundColor: '#e2e8f0', padding: '2px 6px', borderRadius: '4px' }}>{id}</code>
+      <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <h1 style={{ fontSize: '28px', color: '#0f172a', marginBottom: '8px', fontWeight: 600 }}>{campaign.name}</h1>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', color: '#64748b', fontSize: '14px' }}>
+            <span>Campaign ID:</span>
+            <code style={{ backgroundColor: '#e2e8f0', padding: '2px 6px', borderRadius: '4px' }}>{id}</code>
+          </div>
         </div>
+        <button 
+          onClick={() => setEditCampaignModal({ name: campaign.name, promptTemplate: campaign.promptTemplate })}
+          style={{ ...btnStyle, backgroundColor: '#f1f5f9', color: '#0f172a', border: '1px solid #cbd5e1' }}
+        >
+          Edit Campaign
+        </button>
       </div>
 
       <div style={{ ...cardStyle, padding: '24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <h3 style={{ margin: 0, color: '#334155', fontSize: '16px' }}>Campaign Progress</h3>
-          <span style={{ fontSize: '14px', color: '#64748b', fontWeight: 500 }}>{stats.finished} / {stats.total} Generated</span>
+          <span style={{ fontSize: '14px', color: '#64748b', fontWeight: 500 }}>{finishedContacts} / {totalContacts} Generated</span>
         </div>
         <div style={{ width: '100%', height: '8px', backgroundColor: '#e2e8f0', borderRadius: '4px', overflow: 'hidden', marginBottom: '24px' }}>
           <div style={{ height: '100%', width: `${progressPercent}%`, backgroundColor: '#2563eb', transition: 'width 0.3s ease' }} />
@@ -211,8 +226,31 @@ export default function CampaignDetailPage({
                         </div>
                       )}
                       {c.generatedMessage && (
-                        <div style={{ fontSize: '14px', color: '#334155', whiteSpace: 'pre-wrap', backgroundColor: '#f8fafc', padding: '12px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                          {c.generatedMessage}
+                        <div style={{ fontSize: '14px', color: '#334155', backgroundColor: '#f8fafc', padding: '12px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                          <div style={{ 
+                            whiteSpace: 'pre-wrap', 
+                            display: expandedMessageIds.has(c.contactId) ? 'block' : '-webkit-box',
+                            WebkitLineClamp: expandedMessageIds.has(c.contactId) ? 'unset' : 4,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden'
+                          }}>
+                            {c.generatedMessage}
+                          </div>
+                          {c.generatedMessage.length > 200 && (
+                            <button 
+                              onClick={() => {
+                                setExpandedMessageIds(prev => {
+                                  const next = new Set(prev);
+                                  if (next.has(c.contactId)) next.delete(c.contactId);
+                                  else next.add(c.contactId);
+                                  return next;
+                                });
+                              }}
+                              style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '13px', cursor: 'pointer', padding: 0, marginTop: '8px', fontWeight: 500 }}
+                            >
+                              {expandedMessageIds.has(c.contactId) ? 'Show Less' : 'Read More'}
+                            </button>
+                          )}
                         </div>
                       )}
                       {c.status === 'not_generated' && !isGenerating && (
@@ -238,9 +276,32 @@ export default function CampaignDetailPage({
                                   <div style={{ fontStyle: 'italic', marginBottom: '8px' }}>
                                     <strong>Template:</strong> {h.promptTemplate}
                                   </div>
-                                  <div style={{ whiteSpace: 'pre-wrap', color: '#334155' }}>
+                                  <div style={{ 
+                                    whiteSpace: 'pre-wrap', 
+                                    color: '#334155',
+                                    display: expandedMessageIds.has(`${c.contactId}-history-${i}`) ? 'block' : '-webkit-box',
+                                    WebkitLineClamp: expandedMessageIds.has(`${c.contactId}-history-${i}`) ? 'unset' : 3,
+                                    WebkitBoxOrient: 'vertical',
+                                    overflow: 'hidden'
+                                  }}>
                                     {h.generatedMessage}
                                   </div>
+                                  {h.generatedMessage.length > 150 && (
+                                    <button 
+                                      onClick={() => {
+                                        setExpandedMessageIds(prev => {
+                                          const next = new Set(prev);
+                                          const key = `${c.contactId}-history-${i}`;
+                                          if (next.has(key)) next.delete(key);
+                                          else next.add(key);
+                                          return next;
+                                        });
+                                      }}
+                                      style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '13px', cursor: 'pointer', padding: 0, marginTop: '8px', fontWeight: 500 }}
+                                    >
+                                      {expandedMessageIds.has(`${c.contactId}-history-${i}`) ? 'Show Less' : 'Read More'}
+                                    </button>
+                                  )}
                                 </div>
                               ))}
                             </div>
@@ -347,6 +408,43 @@ export default function CampaignDetailPage({
                 style={{ ...btnStyle, backgroundColor: '#2563eb' }}
               >
                 Regenerate Now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {editCampaignModal && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '24px' }}>
+          <div style={{ ...cardStyle, width: '100%', maxWidth: '600px', margin: 0, display: 'flex', flexDirection: 'column' }}>
+            <h2 style={{ marginTop: 0, marginBottom: '16px', color: '#0f172a' }}>Edit Campaign</h2>
+            
+            <label style={{ display: 'block', marginBottom: '8px', color: '#334155', fontSize: '14px', fontWeight: 500 }}>Campaign Name</label>
+            <input
+              value={editCampaignModal.name}
+              onChange={(e) => setEditCampaignModal({ ...editCampaignModal, name: e.target.value })}
+              style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', marginBottom: '16px', fontSize: '14px' }}
+            />
+            
+            <label style={{ display: 'block', marginBottom: '8px', color: '#334155', fontSize: '14px', fontWeight: 500 }}>Prompt Template</label>
+            <textarea
+              value={editCampaignModal.promptTemplate}
+              onChange={(e) => setEditCampaignModal({ ...editCampaignModal, promptTemplate: e.target.value })}
+              style={{ width: '100%', height: '150px', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', marginBottom: '24px', fontFamily: 'monospace', fontSize: '14px', resize: 'vertical' }}
+            />
+            
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button type="button" onClick={() => setEditCampaignModal(null)} style={{ ...btnStyle, backgroundColor: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1' }}>Cancel</button>
+              <button 
+                type="button" 
+                onClick={() => {
+                  updateMutation.mutate({ name: editCampaignModal.name, promptTemplate: editCampaignModal.promptTemplate }, {
+                    onSuccess: () => setEditCampaignModal(null)
+                  });
+                }}
+                disabled={updateMutation.isPending}
+                style={{ ...btnStyle, backgroundColor: '#2563eb', opacity: updateMutation.isPending ? 0.7 : 1 }}
+              >
+                {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
           </div>

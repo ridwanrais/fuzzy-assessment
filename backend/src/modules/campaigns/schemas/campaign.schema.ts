@@ -39,7 +39,7 @@ export class CampaignContact {
     }],
     default: []
   })
-  history: { promptTemplate: string; generatedMessage: string; createdAt: Date }[];
+  history?: { promptTemplate: string; generatedMessage: string; createdAt: Date }[];
 }
 export const CampaignContactSchema = SchemaFactory.createForClass(CampaignContact);
 

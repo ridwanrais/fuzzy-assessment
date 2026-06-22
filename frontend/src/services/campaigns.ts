@@ -50,6 +50,13 @@ export const campaignsApi = {
     });
   },
 
+  update(id: string, body: { name?: string; promptTemplate?: string }): Promise<Campaign> {
+    return request<Campaign>(`/campaigns/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    });
+  },
+
   attachContacts(
     campaignId: string,
     contactIds: string[],

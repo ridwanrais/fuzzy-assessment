@@ -5,6 +5,7 @@ import { Campaign, CampaignDocument, CampaignContact, GenerationStatus } from '.
 import { CreateCampaignDto } from './dtos/create-campaign.dto';
 import { AttachContactsDto } from './dtos/attach-contacts.dto';
 import { GenerateContactDto } from './dtos/generate-contact.dto';
+import { UpdateCampaignDto } from './dtos/update-campaign.dto';
 import { ContactsService } from '../contacts/contacts.service';
 import { LlmService } from '../../shared/llm/llm.service';
 
@@ -70,6 +71,20 @@ export class CampaignsService {
       contacts: mappedContacts,
       stats: { total, finished },
     };
+  }
+
+  async update(userId: string, campaignId: string, dto: UpdateCampaignDto): Promise<Campaign> {
+    const campaign = await this.campaignModel.findOneAndUpdate(
+      { _id: campaignId, userId },
+      { $set: dto },
+      { new: true }
+    ).exec();
+
+    if (!campaign) {
+      throw new NotFoundException('Campaign not found');
+    }
+
+    return campaign;
   }
 
   async attachContacts(

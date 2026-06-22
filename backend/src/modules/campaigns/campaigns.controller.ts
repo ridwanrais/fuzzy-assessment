@@ -1,6 +1,7 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { CampaignsService } from './campaigns.service';
 import { CreateCampaignDto } from './dtos/create-campaign.dto';
+import { UpdateCampaignDto } from './dtos/update-campaign.dto';
 import { AttachContactsDto } from './dtos/attach-contacts.dto';
 import { GenerateContactDto } from './dtos/generate-contact.dto';
 import { UserGuard } from '../../shared/auth/user.guard';
@@ -24,6 +25,15 @@ export class CampaignsController {
   @Get(':id')
   getOne(@CurrentUser() userId: string, @Param('id') id: string) {
     return this.campaignsService.getOne(userId, id);
+  }
+
+  @Patch(':id')
+  update(
+    @CurrentUser() userId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateCampaignDto,
+  ) {
+    return this.campaignsService.update(userId, id, dto);
   }
 
   @Post(':id/contacts')

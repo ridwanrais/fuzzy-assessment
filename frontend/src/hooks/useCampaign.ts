@@ -48,11 +48,19 @@ export function useCampaign(id: string) {
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: (body: { name?: string; promptTemplate?: string }) => campaignsApi.update(id, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['campaign', id] });
+    },
+  });
+
   return {
     data,
     loading,
     error: error instanceof ApiError ? error.message : error?.message || null,
     generateMutation,
     attachMutation,
+    updateMutation,
   };
 }

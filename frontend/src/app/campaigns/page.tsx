@@ -109,17 +109,21 @@ export default function CampaignsPage() {
             <thead>
               <tr style={{ backgroundColor: '#f8fafc', color: '#64748b', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 <th style={{ padding: '16px 24px', fontWeight: 600 }}>Campaign Name</th>
+                <th style={{ padding: '16px 24px', fontWeight: 600 }}>Progress</th>
                 <th style={{ padding: '16px 24px', fontWeight: 600 }}>Created</th>
                 <th style={{ padding: '16px 24px', fontWeight: 600, textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody style={{ opacity: loading ? 0.6 : 1, transition: 'opacity 0.2s' }}>
               {data.length === 0 ? (
-                <tr><td colSpan={3} style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>No campaigns found.</td></tr>
+                <tr><td colSpan={4} style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>No campaigns found.</td></tr>
               ) : (
                 data.map((c) => (
                   <tr key={c._id} style={{ borderTop: '1px solid #e2e8f0' }}>
                     <td style={{ padding: '16px 24px', fontWeight: 500, color: '#0f172a' }}>{c.name}</td>
+                    <td style={{ padding: '16px 24px', color: '#475569' }}>
+                      {c.stats ? `${c.stats.finished} / ${c.stats.total} Generated` : '—'}
+                    </td>
                     <td style={{ padding: '16px 24px', color: '#475569' }}>{new Date(c.createdAt || Date.now()).toLocaleDateString()}</td>
                     <td style={{ padding: '16px 24px', textAlign: 'right' }}>
                       <Link href={`/campaigns/${c._id}`} style={{ color: '#2563eb', textDecoration: 'none', fontWeight: 500 }}>

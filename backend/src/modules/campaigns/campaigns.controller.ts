@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { CampaignsService } from './campaigns.service';
 import { CreateCampaignDto } from './dtos/create-campaign.dto';
 import { AttachContactsDto } from './dtos/attach-contacts.dto';
+import { GenerateContactDto } from './dtos/generate-contact.dto';
 import { UserGuard } from '../../shared/auth/user.guard';
 import { CurrentUser } from '../../shared/auth/current-user.decorator';
 
@@ -39,7 +40,8 @@ export class CampaignsController {
     @CurrentUser() userId: string,
     @Param('id') id: string,
     @Param('contactId') contactId: string,
+    @Body() dto: GenerateContactDto,
   ) {
-    return this.campaignsService.generateForContact(userId, id, contactId);
+    return this.campaignsService.generateForContact(userId, id, contactId, dto);
   }
 }

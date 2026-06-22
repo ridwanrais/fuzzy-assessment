@@ -1,9 +1,10 @@
 'use client';
 
-import { use } from 'react';
+import { use, useRef } from 'react';
 import { useCampaign } from '@/hooks/useCampaign';
 import { useContacts } from '@/hooks/useContacts';
 import { useState } from 'react';
+import Link from 'next/link';
 
 export default function CampaignDetailPage({
   params,
@@ -17,13 +18,25 @@ export default function CampaignDetailPage({
   // Attach Modal State
   const [showAttachModal, setShowAttachModal] = useState(false);
   const [selectedContactIds, setSelectedContactIds] = useState<Set<string>>(new Set());
-  const { data: contactsData, loading: contactsLoading } = useContacts({ page: 1, limit: 100 }); // fetch up to 100 contacts to simplify selection
+  const { data: contactsData, loading: contactsLoading } = useContacts({ page: 1, limit: 100 });
 
+  // Regenerate Modal State
+  const [regenerateModal, setRegenerateModal] = useState<{ contactId: string, template: string } | null>(null);
 
-  const handleGenerate = (contactId: string) => {
+  // History State
+  const [showHistoryId, setShowHistoryId] = useState<string | null>(null);
+
+  // Debounce Ref
+  const lastClickRef = useRef<Record<string, number>>({});
+
+  const handleGenerate = (contactId: string, overrideTemplate?: string) => {
+    const now = Date.now();
+    if (lastClickRef.current[contactId] && now - lastClickRef.current[contactId] < 1000) return;
+    lastClickRef.current[contactId] = now;
+
     setGeneratingIds((prev) => new Set(prev).add(contactId));
 
-    generateMutation.mutate({ contactId }, {
+    generateMutation.mutate({ contactId, overrideTemplate }, {
       onSettled: () => {
         setGeneratingIds((prev) => {
           const next = new Set(prev);
@@ -32,6 +45,10 @@ export default function CampaignDetailPage({
         });
       }
     });
+
+    if (regenerateModal) {
+      setRegenerateModal(null);
+    }
   };
 
   const handleAttach = () => {
@@ -91,6 +108,9 @@ export default function CampaignDetailPage({
 
   if (!campaign) return null;
 
+  const stats = campaign.stats || { total: 0, finished: 0 };
+  const progressPercent = stats.total > 0 ? Math.round((stats.finished / stats.total) * 100) : 0;
+
   return (
     <div style={{ maxWidth: 1000, margin: '0 auto', fontFamily: 'system-ui, sans-serif' }}>
       <div style={{ marginBottom: '32px' }}>
@@ -102,6 +122,14 @@ export default function CampaignDetailPage({
       </div>
 
       <div style={{ ...cardStyle, padding: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <h3 style={{ margin: 0, color: '#334155', fontSize: '16px' }}>Campaign Progress</h3>
+          <span style={{ fontSize: '14px', color: '#64748b', fontWeight: 500 }}>{stats.finished} / {stats.total} Generated</span>
+        </div>
+        <div style={{ width: '100%', height: '8px', backgroundColor: '#e2e8f0', borderRadius: '4px', overflow: 'hidden', marginBottom: '24px' }}>
+          <div style={{ height: '100%', width: `${progressPercent}%`, backgroundColor: '#2563eb', transition: 'width 0.3s ease' }} />
+        </div>
+
         <h3 style={{ marginTop: 0, color: '#334155', fontSize: '16px', marginBottom: '12px' }}>Prompt Template</h3>
         <pre style={{ margin: 0, padding: '16px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', color: '#334155', whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '14px' }}>
           {campaign.promptTemplate}
@@ -137,6 +165,9 @@ export default function CampaignDetailPage({
                 if (c.status === 'finished') { badgeColor = '#dcfce7'; badgeText = '#166534'; }
                 if (c.status === 'failed') { badgeColor = '#fee2e2'; badgeText = '#991b1b'; }
                 if (c.status === 'pending' || isGenerating) { badgeColor = '#fef3c7'; badgeText = '#92400e'; }
+
+                const hasHistory = c.history && c.history.length > 0;
+                const isShowingHistory = showHistoryId === c.contactId;
 
                 return (
                   <tr key={c.contactId} style={{ borderBottom: '1px solid #e2e8f0' }}>
@@ -187,8 +218,37 @@ export default function CampaignDetailPage({
                       {c.status === 'not_generated' && !isGenerating && (
                         <span style={{ color: '#94a3b8', fontSize: '14px', fontStyle: 'italic' }}>Pending generation...</span>
                       )}
+
+                      {hasHistory && (
+                        <div style={{ marginTop: '12px' }}>
+                          <button 
+                            onClick={() => setShowHistoryId(isShowingHistory ? null : c.contactId)}
+                            style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '13px', cursor: 'pointer', padding: 0, fontWeight: 500 }}
+                          >
+                            {isShowingHistory ? 'Hide History ▲' : `View History (${c.history!.length}) ▼`}
+                          </button>
+                          
+                          {isShowingHistory && (
+                            <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                              {[...c.history!].reverse().map((h, i) => (
+                                <div key={i} style={{ fontSize: '13px', color: '#475569', backgroundColor: '#f1f5f9', padding: '12px', borderRadius: '6px' }}>
+                                  <div style={{ marginBottom: '8px', color: '#0f172a', fontWeight: 500 }}>
+                                    {new Date(h.createdAt).toLocaleString()}
+                                  </div>
+                                  <div style={{ fontStyle: 'italic', marginBottom: '8px' }}>
+                                    <strong>Template:</strong> {h.promptTemplate}
+                                  </div>
+                                  <div style={{ whiteSpace: 'pre-wrap', color: '#334155' }}>
+                                    {h.generatedMessage}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </td>
-                    <td style={{ padding: '16px 24px', verticalAlign: 'top', textAlign: 'right' }}>
+                    <td style={{ padding: '16px 24px', verticalAlign: 'top', textAlign: 'right', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
                       <button
                         onClick={() => handleGenerate(c.contactId)}
                         disabled={isGenerating}
@@ -196,6 +256,16 @@ export default function CampaignDetailPage({
                       >
                         {isGenerating ? 'Generating...' : (c.status === 'finished' || c.status === 'failed' ? 'Regenerate' : 'Generate')}
                       </button>
+                      
+                      {(c.status === 'finished' || c.status === 'failed') && (
+                        <button
+                          onClick={() => setRegenerateModal({ contactId: c.contactId, template: campaign.promptTemplate })}
+                          disabled={isGenerating}
+                          style={{ ...btnStyle, backgroundColor: '#f1f5f9', color: '#0f172a', border: '1px solid #cbd5e1', opacity: isGenerating ? 0.5 : 1, cursor: isGenerating ? 'not-allowed' : 'pointer' }}
+                        >
+                          Edit & Regenerate
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
@@ -251,6 +321,32 @@ export default function CampaignDetailPage({
                 style={{ ...btnStyle, backgroundColor: '#2563eb', opacity: attachMutation.isPending || selectedContactIds.size === 0 ? 0.7 : 1 }}
               >
                 {attachMutation.isPending ? 'Attaching...' : `Attach ${selectedContactIds.size} Contacts`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {regenerateModal && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '24px' }}>
+          <div style={{ ...cardStyle, width: '100%', maxWidth: '600px', margin: 0, display: 'flex', flexDirection: 'column' }}>
+            <h2 style={{ marginTop: 0, marginBottom: '16px', color: '#0f172a' }}>Edit Template & Regenerate</h2>
+            <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '16px' }}>
+              Tweak the template specifically for this contact. This will override the campaign default and save the previous message to history.
+            </p>
+            <textarea
+              value={regenerateModal.template}
+              onChange={(e) => setRegenerateModal({ ...regenerateModal, template: e.target.value })}
+              style={{ width: '100%', height: '150px', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', marginBottom: '24px', fontFamily: 'monospace', fontSize: '14px', resize: 'vertical' }}
+            />
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button type="button" onClick={() => setRegenerateModal(null)} style={{ ...btnStyle, backgroundColor: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1' }}>Cancel</button>
+              <button 
+                type="button" 
+                onClick={() => handleGenerate(regenerateModal.contactId, regenerateModal.template)}
+                style={{ ...btnStyle, backgroundColor: '#2563eb' }}
+              >
+                Regenerate Now
               </button>
             </div>
           </div>

@@ -4,6 +4,7 @@ import mongoose, { Model } from 'mongoose';
 import { Campaign, CampaignDocument, CampaignContact, GenerationStatus } from './schemas/campaign.schema';
 import { CreateCampaignDto } from './dtos/create-campaign.dto';
 import { AttachContactsDto } from './dtos/attach-contacts.dto';
+import { GenerateContactDto } from './dtos/generate-contact.dto';
 import { ContactsService } from '../contacts/contacts.service';
 import { LlmService } from '../../shared/llm/llm.service';
 
@@ -24,15 +25,22 @@ export class CampaignsService {
     return createdCampaign.save();
   }
 
-  async list(userId: string): Promise<Campaign[]> {
-    return this.campaignModel
+  async list(userId: string): Promise<any[]> {
+    const campaigns = await this.campaignModel
       .find({ userId })
-      .select('-contacts') // Exclude contacts array for the list view to keep it lightweight
       .sort({ createdAt: -1 })
+      .lean()
       .exec();
+
+    return campaigns.map((c) => {
+      const total = c.contacts?.length || 0;
+      const finished = c.contacts?.filter((cc) => cc.status === 'finished').length || 0;
+      const { contacts, ...rest } = c as any;
+      return { ...rest, stats: { total, finished } };
+    });
   }
 
-  async getOne(userId: string, campaignId: string): Promise<Omit<Campaign, 'contacts'> & { contacts: (Omit<CampaignContact, 'contactId'> & { contactId: string; contact: unknown })[] }> {
+  async getOne(userId: string, campaignId: string): Promise<Omit<Campaign, 'contacts'> & { contacts: (Omit<CampaignContact, 'contactId'> & { contactId: string; contact: unknown })[], stats: { total: number, finished: number } }> {
     const campaign = await this.campaignModel.findOne({ _id: campaignId, userId }).exec();
     if (!campaign) {
       throw new NotFoundException('Campaign not found');
@@ -54,9 +62,13 @@ export class CampaignsService {
       };
     });
 
+    const total = doc.contacts?.length || 0;
+    const finished = doc.contacts?.filter((cc) => cc.status === 'finished').length || 0;
+
     return {
       ...doc,
       contacts: mappedContacts,
+      stats: { total, finished },
     };
   }
 
@@ -92,6 +104,7 @@ export class CampaignsService {
     userId: string,
     campaignId: string,
     contactId: string,
+    dto?: GenerateContactDto
   ): Promise<{ status: string; message?: string; error?: string }> {
     const campaign = await this.campaignModel.findOne({ _id: campaignId, userId }).exec();
     if (!campaign) {
@@ -116,7 +129,8 @@ export class CampaignsService {
 
     try {
       // Interpolate
-      let prompt = campaign.promptTemplate;
+      const unInterpolatedTemplate = dto?.overrideTemplate || campaign.promptTemplate;
+      let prompt = unInterpolatedTemplate;
       const data: Record<string, string> = {
         name: contact.name || '',
         email: contact.email || '',
@@ -135,6 +149,14 @@ export class CampaignsService {
 
       campaignContact.status = GenerationStatus.FINISHED;
       campaignContact.generatedMessage = message;
+      
+      campaignContact.history = campaignContact.history || [];
+      campaignContact.history.push({
+        promptTemplate: unInterpolatedTemplate,
+        generatedMessage: message,
+        createdAt: new Date()
+      });
+
       await campaign.save();
 
       return {

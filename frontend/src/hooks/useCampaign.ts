@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { campaignsApi } from '@/services/campaigns';
+import { campaignsApi, Campaign } from '@/services/campaigns';
 import { ApiError } from '@/services/api';
 
 export function useCampaign(id: string) {
@@ -14,9 +14,29 @@ export function useCampaign(id: string) {
   });
 
   const generateMutation = useMutation({
-    mutationFn: ({ contactId }: { contactId: string }) => 
-      campaignsApi.generate(id, contactId),
-    onSuccess: () => {
+    mutationFn: ({ contactId, overrideTemplate }: { contactId: string; overrideTemplate?: string }) => 
+      campaignsApi.generate(id, contactId, overrideTemplate),
+    onMutate: async ({ contactId }) => {
+      await queryClient.cancelQueries({ queryKey: ['campaign', id] });
+      const previousCampaign = queryClient.getQueryData<Campaign>(['campaign', id]);
+      if (previousCampaign) {
+        queryClient.setQueryData<Campaign>(['campaign', id], {
+          ...previousCampaign,
+          contacts: previousCampaign.contacts.map((c) =>
+            c.contactId === contactId
+              ? { ...c, status: 'pending', generatedMessage: undefined, error: undefined }
+              : c
+          ),
+        });
+      }
+      return { previousCampaign };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousCampaign) {
+        queryClient.setQueryData(['campaign', id], context.previousCampaign);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['campaign', id] });
     },
   });

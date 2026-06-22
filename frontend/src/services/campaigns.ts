@@ -11,6 +11,7 @@ export interface CampaignContact {
   status: 'not_generated' | 'pending' | 'finished' | 'failed';
   generatedMessage?: string;
   error?: string;
+  history?: { promptTemplate: string; generatedMessage: string; createdAt: string }[];
 }
 
 export interface Campaign {
@@ -19,6 +20,7 @@ export interface Campaign {
   promptTemplate: string;
   contacts: CampaignContact[];
   createdAt?: string;
+  stats?: { total: number; finished: number };
 }
 
 export const campaignsApi = {
@@ -33,9 +35,11 @@ export const campaignsApi = {
   generate(
     campaignId: string,
     contactId: string,
+    overrideTemplate?: string,
   ): Promise<{ status: string; message?: string; error?: string }> {
     return request(`/campaigns/${campaignId}/contacts/${contactId}/generate`, {
       method: 'POST',
+      body: overrideTemplate ? JSON.stringify({ overrideTemplate }) : undefined,
     });
   },
 

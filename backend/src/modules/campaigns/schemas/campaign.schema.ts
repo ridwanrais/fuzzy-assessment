@@ -30,6 +30,16 @@ export class CampaignContact {
 
   @Prop()
   error?: string;
+
+  @Prop({
+    type: [{
+      promptTemplate: String,
+      generatedMessage: String,
+      createdAt: Date
+    }],
+    default: []
+  })
+  history: { promptTemplate: string; generatedMessage: string; createdAt: Date }[];
 }
 export const CampaignContactSchema = SchemaFactory.createForClass(CampaignContact);
 

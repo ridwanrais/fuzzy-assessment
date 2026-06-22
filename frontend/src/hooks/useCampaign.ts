@@ -21,10 +21,18 @@ export function useCampaign(id: string) {
     },
   });
 
+  const attachMutation = useMutation({
+    mutationFn: (contactIds: string[]) => campaignsApi.attachContacts(id, contactIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['campaign', id] });
+    },
+  });
+
   return {
     data,
     loading,
     error: error instanceof ApiError ? error.message : error?.message || null,
     generateMutation,
+    attachMutation,
   };
 }

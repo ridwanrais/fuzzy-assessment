@@ -15,6 +15,11 @@ export class CampaignsController {
     return this.campaignsService.create(userId, dto);
   }
 
+  @Get()
+  list(@CurrentUser() userId: string) {
+    return this.campaignsService.list(userId);
+  }
+
   @Get(':id')
   getOne(@CurrentUser() userId: string, @Param('id') id: string) {
     return this.campaignsService.getOne(userId, id);

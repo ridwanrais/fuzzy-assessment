@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import mongoose, { Model } from 'mongoose';
-import { Campaign, CampaignDocument, GenerationStatus } from './schemas/campaign.schema';
+import { Campaign, CampaignDocument, CampaignContact, GenerationStatus } from './schemas/campaign.schema';
 import { CreateCampaignDto } from './dtos/create-campaign.dto';
 import { AttachContactsDto } from './dtos/attach-contacts.dto';
 import { ContactsService } from '../contacts/contacts.service';
@@ -22,6 +22,14 @@ export class CampaignsService {
       userId,
     });
     return createdCampaign.save();
+  }
+
+  async list(userId: string): Promise<Campaign[]> {
+    return this.campaignModel
+      .find({ userId })
+      .select('-contacts') // Exclude contacts array for the list view to keep it lightweight
+      .sort({ createdAt: -1 })
+      .exec();
   }
 
   async getOne(userId: string, campaignId: string): Promise<Omit<Campaign, 'contacts'> & { contacts: (Omit<CampaignContact, 'contactId'> & { contactId: string; contact: unknown })[] }> {

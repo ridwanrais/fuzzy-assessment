@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsNotEmpty, IsString, Matches } from 'class-validator';
 
 export class CreateCampaignDto {
   @IsString()
@@ -8,5 +8,6 @@ export class CreateCampaignDto {
   /** Must contain {{placeholders}} that map to contact fields. */
   @IsString()
   @IsNotEmpty()
+  @Matches(/\{\{name\}\}/, { message: 'Prompt template must include at least the {{name}} placeholder.' })
   promptTemplate: string;
 }

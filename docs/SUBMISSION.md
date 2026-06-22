@@ -34,7 +34,7 @@ deliberate scope cuts (which we respect). Be honest; "didn't get to X" is fine.
 - [ ] Generate button per contact with idle → generating → result + error states
 
 ## Stretch (optional)
-- [ ] _list anything extra you built_
+- [x] Implemented `@tanstack/react-query` for data fetching, caching, and state management.
 
 ## How to run
 - LLM provider I used: `__________`  (anthropic / openai / gemini)

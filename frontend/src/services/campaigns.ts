@@ -18,9 +18,14 @@ export interface Campaign {
   name: string;
   promptTemplate: string;
   contacts: CampaignContact[];
+  createdAt?: string;
 }
 
 export const campaignsApi = {
+  list(): Promise<Campaign[]> {
+    return request<Campaign[]>('/campaigns');
+  },
+
   getOne(id: string): Promise<Campaign> {
     return request<Campaign>(`/campaigns/${id}`);
   },

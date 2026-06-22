@@ -2,6 +2,7 @@
 
 import { use } from 'react';
 import { useCampaign } from '@/hooks/useCampaign';
+import { useContacts } from '@/hooks/useContacts';
 import { useState } from 'react';
 
 export default function CampaignDetailPage({
@@ -10,8 +11,14 @@ export default function CampaignDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const { data: campaign, loading, error, generateMutation } = useCampaign(id);
+  const { data: campaign, loading, error, generateMutation, attachMutation } = useCampaign(id);
   const [generatingIds, setGeneratingIds] = useState<Set<string>>(new Set());
+  
+  // Attach Modal State
+  const [showAttachModal, setShowAttachModal] = useState(false);
+  const [selectedContactIds, setSelectedContactIds] = useState<Set<string>>(new Set());
+  const { data: contactsData, loading: contactsLoading } = useContacts({ page: 1, limit: 100 }); // fetch up to 100 contacts to simplify selection
+
 
   const handleGenerate = (contactId: string) => {
     setGeneratingIds((prev) => new Set(prev).add(contactId));
@@ -24,6 +31,24 @@ export default function CampaignDetailPage({
           return next;
         });
       }
+    });
+  };
+
+  const handleAttach = () => {
+    attachMutation.mutate(Array.from(selectedContactIds), {
+      onSuccess: () => {
+        setShowAttachModal(false);
+        setSelectedContactIds(new Set());
+      }
+    });
+  };
+
+  const toggleSelection = (contactId: string) => {
+    setSelectedContactIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(contactId)) next.delete(contactId);
+      else next.add(contactId);
+      return next;
     });
   };
 
@@ -83,9 +108,12 @@ export default function CampaignDetailPage({
         </pre>
       </div>
 
-      <h2 style={{ fontSize: '20px', color: '#0f172a', marginTop: '32px', marginBottom: '16px', fontWeight: 600 }}>
-        Attached Contacts <span style={{ color: '#64748b', fontWeight: 400, fontSize: '16px' }}>({campaign.contacts.length})</span>
-      </h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '32px', marginBottom: '16px' }}>
+        <h2 style={{ fontSize: '20px', color: '#0f172a', margin: 0, fontWeight: 600 }}>
+          Attached Contacts <span style={{ color: '#64748b', fontWeight: 400, fontSize: '16px' }}>({campaign.contacts.length})</span>
+        </h2>
+        <button onClick={() => setShowAttachModal(true)} style={btnStyle}>+ Attach Contacts</button>
+      </div>
       
       <div style={cardStyle}>
         {campaign.contacts.length === 0 ? (
@@ -132,7 +160,22 @@ export default function CampaignDetailPage({
                     </td>
                     <td style={{ padding: '16px 24px', verticalAlign: 'top' }}>
                       {c.status === 'failed' && c.error && (
-                        <div style={{ color: '#ef4444', fontSize: '14px', backgroundColor: '#fef2f2', padding: '8px 12px', borderRadius: '6px' }}>
+                        <div 
+                          title={c.error}
+                          style={{ 
+                            color: '#ef4444', 
+                            fontSize: '14px', 
+                            backgroundColor: '#fef2f2', 
+                            padding: '8px 12px', 
+                            borderRadius: '6px',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 3,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            wordBreak: 'break-word'
+                          }}
+                        >
                           {c.error}
                         </div>
                       )}
@@ -161,6 +204,58 @@ export default function CampaignDetailPage({
           </table>
         )}
       </div>
+
+      {showAttachModal && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '24px' }}>
+          <div style={{ ...cardStyle, width: '100%', maxWidth: '600px', margin: 0, display: 'flex', flexDirection: 'column', maxHeight: '80vh' }}>
+            <h2 style={{ marginTop: 0, marginBottom: '16px', color: '#0f172a' }}>Attach Contacts</h2>
+            <div style={{ overflowY: 'auto', flex: 1, border: '1px solid #e2e8f0', borderRadius: '8px', marginBottom: '16px' }}>
+              {contactsLoading ? (
+                <div style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>Loading contacts...</div>
+              ) : contactsData?.items.length === 0 ? (
+                <div style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>No contacts available. Create some first!</div>
+              ) : (
+                <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
+                  <tbody>
+                    {contactsData?.items.map((c) => {
+                      const isAlreadyAttached = campaign.contacts.some(cc => cc.contactId === c._id);
+                      return (
+                        <tr key={c._id} style={{ borderBottom: '1px solid #e2e8f0', opacity: isAlreadyAttached ? 0.5 : 1, backgroundColor: selectedContactIds.has(c._id) ? '#f0fdf4' : 'transparent' }}>
+                          <td style={{ padding: '12px 16px', width: '40px' }}>
+                            <input 
+                              type="checkbox" 
+                              checked={isAlreadyAttached || selectedContactIds.has(c._id)} 
+                              onChange={() => toggleSelection(c._id)} 
+                              disabled={isAlreadyAttached}
+                              style={{ cursor: isAlreadyAttached ? 'not-allowed' : 'pointer' }} 
+                            />
+                          </td>
+                          <td style={{ padding: '12px 16px', fontWeight: 500, color: '#0f172a' }}>{c.name}</td>
+                          <td style={{ padding: '12px 16px', color: '#475569' }}>{c.company || '—'}</td>
+                          <td style={{ padding: '12px 16px', color: '#64748b', fontSize: '13px' }}>
+                            {isAlreadyAttached && 'Attached'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button type="button" onClick={() => { setShowAttachModal(false); setSelectedContactIds(new Set()); }} style={{ ...btnStyle, backgroundColor: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1' }}>Cancel</button>
+              <button 
+                type="button" 
+                onClick={handleAttach}
+                disabled={attachMutation.isPending || selectedContactIds.size === 0} 
+                style={{ ...btnStyle, backgroundColor: '#2563eb', opacity: attachMutation.isPending || selectedContactIds.size === 0 ? 0.7 : 1 }}
+              >
+                {attachMutation.isPending ? 'Attaching...' : `Attach ${selectedContactIds.size} Contacts`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

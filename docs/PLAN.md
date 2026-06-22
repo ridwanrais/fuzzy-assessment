@@ -79,4 +79,7 @@ _override or distrust it?_
 - The AI wants to immediately jump to frontend code even before we finishes with the backend side. While I understand its intention to deliver a complete product quickly, I believe it's critical to fully build out the backend first and make sure it works as intended before moving on to the frontend.
 - I noticed that the AI sometimes is using 'any' type in the code. While I understand it makes it easier to write code at first, maintaining in the long term will be utter hell (speaking from experience). I believe it's better to use proper types to ensure type safety.
 - For the frontend, I choose to use TanStack Query (React Query) for state management and data fetching instead of the default API client since it handles caching, invalidation, and synchronization automatically. This approach treats the frontend as a remote cache for the backend database, which is highly effective for applications that primarily display and manipulate stored data.
+- The AI hallucinate and claims that, for the frontend app, we don't have to provide the UI for "build campaign" and "generate campaign for contact" feature since it's not explicitly asked by the TASK.md. After I pushed back, it realizes its mistake and went ahead to implement them. 
+- The AI has done various UI/UX implementation quirkness on "Create Campaign" page. I needed to iterate back and forth with it to finally get the right UI/UX implementation. 
+- 
 

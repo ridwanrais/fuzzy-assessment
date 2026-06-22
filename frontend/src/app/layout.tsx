@@ -23,6 +23,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           >
             <Link href="/" style={{ textDecoration: 'none', color: '#334155', fontWeight: 500 }}>Home</Link>
             <Link href="/contacts" style={{ textDecoration: 'none', color: '#334155', fontWeight: 500 }}>Contacts</Link>
+            <Link href="/campaigns" style={{ textDecoration: 'none', color: '#334155', fontWeight: 500 }}>Campaigns</Link>
           </nav>
           <main style={{ padding: '32px', maxWidth: 1200, margin: '0 auto' }}>{children}</main>
         </Providers>

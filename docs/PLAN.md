@@ -71,9 +71,12 @@ _What did you choose NOT to build, and why? What would you do next with more tim
 _Which AI tools did you use, for what? Where did you accept its output, and where did you_
 _override or distrust it?_
 
-- The AI tried to use npm to install and manage npm packages. Nothing is inherently wrong with that at all. However, I choose to use bun as the JavaScript runtime and package manager for this project because of its superior speed and performance ([https://techsy.io/en/blog/bun-vs-pnpm-vs-yarn-vs-npm](https://techsy.io/en/blog/bun-vs-pnpm-vs-yarn-vs-npm)).
-- The AI wants to immediately jump to frontend code even before we finishes with the backend side. While I understand its intention to deliver a complete product quickly, I believe it's critical to fully build out the backend first and make sure it works as intended before moving on to the frontend.
-- I noticed that the AI sometimes is using 'any' type in the code. While I understand it makes it easier to write code at first, maintaining in the long term will be utter hell (speaking from experience). I believe it's better to use proper types to ensure type safety.
 - I used Antigravity as my primary autonomous coding agent to help bootstrap and implement the NestJS backend and Next.js frontend scaffolding.
 - I specifically chose Antigravity as the primary coding agent because it automatically presents a clear, easy-to-read implementation plan before writing any code. This transparent workflow makes it much easier to analyze, review, and modify architectural decisions upfront before a single line of code is committed.
 - I also utilized Goggle AI Studio as my LLM key provider for the actual app's generation endpoints since I happen to have a Google One AI Premium subscription, giving me access to Gemini 1.5 Pro.
+
+- The AI tried to use npm to install and manage npm packages. Nothing is inherently wrong with that at all. However, I choose to use bun as the JavaScript runtime and package manager for this project because of its superior speed and performance ([https://techsy.io/en/blog/bun-vs-pnpm-vs-yarn-vs-npm](https://techsy.io/en/blog/bun-vs-pnpm-vs-yarn-vs-npm)).
+- The AI wants to immediately jump to frontend code even before we finishes with the backend side. While I understand its intention to deliver a complete product quickly, I believe it's critical to fully build out the backend first and make sure it works as intended before moving on to the frontend.
+- I noticed that the AI sometimes is using 'any' type in the code. While I understand it makes it easier to write code at first, maintaining in the long term will be utter hell (speaking from experience). I believe it's better to use proper types to ensure type safety.
+- For the frontend, I choose to use TanStack Query (React Query) for state management and data fetching instead of the default API client since it handles caching, invalidation, and synchronization automatically. This approach treats the frontend as a remote cache for the backend database, which is highly effective for applications that primarily display and manipulate stored data.
+

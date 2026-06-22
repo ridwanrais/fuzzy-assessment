@@ -7,6 +7,7 @@ import { request } from './api';
 
 export interface CampaignContact {
   contactId: string;
+  contact: { _id: string; name: string; email: string }; // populated
   status: 'not_generated' | 'pending' | 'finished' | 'failed';
   generatedMessage?: string;
   error?: string;
@@ -33,5 +34,20 @@ export const campaignsApi = {
     });
   },
 
-  // TODO(candidate): create(), attachContacts(), etc.
+  create(body: { name: string; promptTemplate: string }): Promise<Campaign> {
+    return request<Campaign>('/campaigns', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  },
+
+  attachContacts(
+    campaignId: string,
+    contactIds: string[],
+  ): Promise<Campaign> {
+    return request<Campaign>(`/campaigns/${campaignId}/contacts`, {
+      method: 'POST',
+      body: JSON.stringify({ contactIds }),
+    });
+  },
 };

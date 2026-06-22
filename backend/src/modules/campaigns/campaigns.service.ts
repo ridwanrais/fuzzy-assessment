@@ -24,22 +24,32 @@ export class CampaignsService {
     return createdCampaign.save();
   }
 
-  async getOne(userId: string, campaignId: string): Promise<Campaign> {
+  async getOne(userId: string, campaignId: string): Promise<Omit<Campaign, 'contacts'> & { contacts: (Omit<CampaignContact, 'contactId'> & { contactId: string; contact: unknown })[] }> {
     const campaign = await this.campaignModel.findOne({ _id: campaignId, userId }).exec();
     if (!campaign) {
       throw new NotFoundException('Campaign not found');
     }
     
-    // In a real scenario we might want to .populate('contacts.contactId') here,
-    // but the subdoc only has contactId. We can fetch and map the contacts.
-    // For simplicity, we just return the campaign. The frontend or controller could stitch it if needed.
-    // Actually, populating is better so the frontend has contact names.
     await campaign.populate({
       path: 'contacts.contactId',
       model: 'Contact',
     });
     
-    return campaign;
+    const doc = campaign.toObject();
+    const mappedContacts = doc.contacts.map((c) => {
+      // At this point, c.contactId is the populated Contact object.
+      const populatedContact = c.contactId as unknown as { _id: mongoose.Types.ObjectId };
+      return {
+        ...c,
+        contact: populatedContact,
+        contactId: populatedContact._id.toString(),
+      };
+    });
+    
+    return {
+      ...doc,
+      contacts: mappedContacts,
+    };
   }
 
   async attachContacts(
